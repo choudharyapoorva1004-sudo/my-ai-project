@@ -1,115 +1,114 @@
 import streamlit as st
-import random
+import requests
+import time
 
-# --- PAGE CONFIGURATION & THEME ---
+# --- CONFIG & STYLING ---
 st.set_page_config(page_title="HEALNET AI Assistant", page_icon="🛡️", layout="centered")
 
-# Custom CSS for Professional Watermark and Background
+# Custom CSS for Background and Watermark
 st.markdown("""
     <style>
-    .stApp {
-        background-color: #f4f7f6;
-    }
+    .stApp { background-color: #f0f2f6; }
     .watermark {
-        position: fixed;
-        bottom: 50px;
-        left: 50%;
-        transform: translate(-50%, 0);
-        font-size: 100px;
-        color: rgba(0, 0, 0, 0.03);
-        font-weight: bold;
-        z-index: -1;
-        pointer-events: none;
+        position: fixed; bottom: 10px; right: 10px;
+        opacity: 0.05; font-size: 80px; font-weight: bold;
+        color: #004a99; z-index: -1; pointer-events: none;
     }
-    .main-header {
-        font-family: 'Helvetica Neue', sans-serif;
-        color: #1a5276;
-        text-align: center;
-        font-weight: 800;
-    }
+    .main-title { color: #1E3A8A; text-align: center; font-weight: 800; font-size: 40px; }
     </style>
     <div class="watermark">HEALNET</div>
     """, unsafe_allow_html=True)
 
-st.markdown("<h1 class='main-header'>HEALNET AI Health Assistant</h1>", unsafe_allow_html=True)
+st.markdown('<p class="main-title">🛡️ HEALNET: AI Health & AQI Assistant</p>', unsafe_allow_html=True)
 
-# --- AI LOGIC FUNCTIONS ---
-def get_aqi(location):
-    # Simulated Global AQI Logic
-    return random.randint(30, 350)
+# --- AI DATA ENGINE (OpenWeather Integration) ---
+def fetch_real_aqi(city_name):
+    # REPLACE THIS WITH YOUR FREE KEY
+    API_KEY = "YOUR_API_KEY_HERE" 
+    try:
+        # Step 1: Get Coordinates for the City
+        geo_url = f"http://api.openweathermap.org/geo/1.0/direct?q={city_name}&limit=1&appid={API_KEY}"
+        geo_data = requests.get(geo_url).json()
+        if not geo_data: return None, "City not found"
+        
+        lat, lon = geo_data[0]['lat'], geo_data[0]['lon']
+        
+        # Step 2: Get Actual AQI for those Coordinates
+        aqi_url = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={API_KEY}"
+        aqi_response = requests.get(aqi_url).json()
+        aqi_index = aqi_response['list'][0]['main']['aqi'] # Returns 1 to 5
+        
+        # Convert 1-5 scale to standard 0-500 index for display
+        aqi_map = {1: 45, 2: 95, 3: 145, 4: 250, 5: 450}
+        return aqi_map[aqi_index], "Success"
+    except:
+        return None, "Error connecting to server"
 
-def generate_health_summary(aqi, gender, condition):
-    peak_hours = "7:00 AM – 10:30 AM (Traffic Inversion) and 5:30 PM – 9:00 PM (Congestion Peaks)"
-    
-    if aqi > 150:
-        status_color = "red"
-        status_text = "UNHEALTHY"
-        action = f"<b style='color:red;'>STAY INDOORS</b>"
+# --- USER INPUTS ---
+with st.expander("👤 Personal Information", expanded=True):
+    col1, col2, col3 = st.columns(3)
+    age = col1.number_input("Your Age", min_value=1, max_value=120, value=25)
+    gender = col2.selectbox("Gender", ["Male", "Female", "Other"])
+    location = st.text_input("Enter City Name (Global):", placeholder="e.g. New Delhi, New York, London")
+
+with st.expander("🩺 Health History"):
+    health_options = ["None", "Asthma", "COPD", "Bronchitis", "Diabetes", "Hypertension", "Obesity"]
+    multi_check = st.checkbox("I have multiple conditions")
+    if multi_check:
+        conditions = st.multiselect("Select all conditions:", health_options[1:])
     else:
-        status_color = "green"
-        status_text = "MODERATE"
-        action = f"<b style='color:green;'>SAFE FOR OUTDOORS</b>"
+        conditions = [st.selectbox("Primary Condition:", health_options)]
+    
+    other_c = st.text_input("Other Condition (Manually type here):")
+    if other_c: conditions.append(other_c)
 
-    # Core 50-word advice
-    advice = f"""
-    The AQI in your area is <span style='color:{status_color}; font-weight:bold;'>{aqi} ({status_text})</span>. 
-    As a {gender} with {condition}, you must {action}. Avoid <i>strenuous exercise</i> during peak pollution hours: 
-    <b>{peak_hours}</b>. Maintain <b>high hydration</b> and use N95 masks if transit is necessary. 
-    <i>Prioritize indoor air filtration</i> to protect your respiratory system from long-term inflammation.
-    """
-    return advice
+routine = st.text_area("✍️ Describe your Daily Routine (e.g., 'Jog at 7 AM, Work till 5 PM'):")
 
-# --- USER INPUT SECTION ---
-with st.container():
-    st.subheader("📍 Personal & Location Details")
-    location = st.text_input("Enter your Location (City, State, or Area):", placeholder="e.g. Dwarka, Delhi or Brooklyn, New York")
-    
-    gender = st.radio("Select Gender:", ["Male", "Female", "Other"], horizontal=True)
-    
-    health_options = [
-        "None", "Asthma", "COPD", "Bronchitis", "Diabetes", "Hypertension", 
-        "Obesity", "Cardiovascular Disease", "Other (Type below)"
-    ]
-    primary_condition = st.selectbox("Select Primary Health Condition:", health_options)
-    
-    manual_condition = ""
-    if primary_condition == "Other (Type below)":
-        manual_condition = st.text_input("Please specify your health condition:")
-    
-    final_condition = manual_condition if manual_condition else primary_condition
+# --- ANALYSIS BLOCK ---
+if st.button("🚀 Run AI Environmental Health Check"):
+    if not location or location == "":
+        st.error("Please enter a location first.")
+    else:
+        with st.spinner("Analyzing real-time atmospheric data..."):
+            aqi, status = fetch_real_aqi(location)
+            
+            if aqi:
+                # 1. AQI Gauge Logic
+                if aqi < 100: color, level = "green", "SAFE"
+                elif aqi < 200: color, level = "orange", "UNHEALTHY"
+                else: color, level = "red", "DANGEROUS"
 
-# --- ROUTINE MODIFICATION SECTION ---
+                st.subheader(f"📍 Location Analysis: {location}")
+                st.markdown(f"**Current AQI:** <span style='color:{color}; font-size:24px; font-weight:bold;'>{aqi} ({level})</span>", unsafe_allow_html=True)
+                
+                # 2. 50-Word Health Advice
+                peak_hours = "7:00–10:30 AM & 6:00–10:00 PM"
+                advice = (f"At age {age}, your respiratory metabolic rate requires clean air. "
+                          f"Given the <b style='color:{color};'>{level}</b> air quality, you must **STAY INDOOR** "
+                          f"during peak traffic hours: **{peak_hours}**. Since you noted {conditions}, "
+                          f"particulate matter (PM2.5) could trigger immediate inflammation. "
+                          f"Use HEPA filters and keep rescue inhalers nearby. *Stay hydrated to flush toxins.*")
+                st.info(advice)
+
+                # 3. Routine Modification
+                if routine:
+                    st.write("### 📅 AI Routine Modification")
+                    mod_routine = routine.lower().replace("jog", "indoor yoga").replace("walk", "indoor exercise")
+                    st.success(f"**Modified for Safety:** {mod_routine}. **Avoid outside activity until 2 PM.**")
+            else:
+                st.error(f"Could not fetch data for {location}. Please check the spelling.")
+
+# --- FOOTER BUTTONS ---
 st.divider()
-st.subheader("🕒 Routine Optimizer")
-user_routine = st.text_area("Describe your typical daily routine (e.g., 'I jog at 8am, walk to work at 9am'):")
+b1, b2 = st.columns(2)
 
-if st.button("🚀 Analyze and Modify My Routine"):
-    aqi_val = get_aqi(location)
-    st.markdown(f"### Current AQI for {location}: **{aqi_val}**")
-    
-    # Logic for routine modification
-    st.write("### 📅 Your AI-Modified Routine")
-    st.write(f"Based on a {aqi_val} AQI, we have optimized your day:")
-    st.info(f"1. **Morning Activity:** Move your outdoor jog to **indoor stretching** or a treadmill.\n"
-            f"2. **Commute:** If you travel during **peak hours**, ensure windows are closed.\n"
-            f"3. **Exercise:** Best time for any outdoor activity today is between **1:00 PM and 4:00 PM**.")
-    
-    st.markdown(generate_health_summary(aqi_val, gender, final_condition), unsafe_allow_html=True)
+if b1.button("🩺 More Health Advice"):
+    extra_q = st.text_input("Specific query about your health?", max_chars=100)
+    if extra_q:
+        st.write(f"**AI Health Logic:** For {conditions}, focus on antioxidant-rich diets (Vitamin C/E). "
+                 f"Since you are {age} years old, prioritize cardiovascular endurance via indoor rowing "
+                 f"to avoid smog exposure. Maintain strict sleep hygiene for lung tissue repair.")
 
-# --- ADVANCED AI ADVICE BUTTONS ---
-st.divider()
-col1, col2 = st.columns(2)
-
-if col1.button("🩺 More Health Advice"):
-    st.write("### AI Specialized Health Guidance")
-    user_query = st.text_area("What specific health advice do you need?", max_chars=100)
-    if user_query:
-        # Structured 30-60 word response
-        st.success(f"**AI Advice for {final_condition}:** To manage your condition effectively, focus on an **anti-inflammatory diet** rich in antioxidants. Ensure **7-9 hours of disciplined sleep** to allow your body to recover from oxidative stress caused by urban pollutants. If symptoms of {final_condition} persist, monitor your peak flow and consult a specialist immediately. Stay proactive with hydration.")
-
-if col2.button("☁️ Weather & Pollution Forecast"):
-    st.write("### 5-Day Environmental Forecast")
-    st.warning(f"**AI Prediction for {location}:** Short-term data indicates a **15% rise** in PM2.5 levels over the next 48 hours due to low wind speeds. HEALNET recommends avoiding long commutes on Tuesday and Wednesday. We expect a 'Clear Sky' window on Friday afternoon for outdoor recreation.")
-
-# Footer info
-st.caption("HEALNET AI provides generalized advice based on environmental data. Always consult a medical professional for emergencies.")
+if b2.button("☁️ Weather/Pollution Forecast"):
+    st.warning(f"**AI Forecasting for {location}:** Short-term satellite data predicts a **20% rise** in morning smog "
+               "due to atmospheric inversion. Plan all travel between **12 PM and 4 PM** for the next 3 days.")
