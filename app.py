@@ -55,7 +55,7 @@ st.markdown('<div class="header-container"><p class="header-text">🛡️ HEALNE
 
 # --- AI DATA INTEGRATION ENGINE ---
 def fetch_pollution_data(location_query):
-    API_KEY = "aa94890b5ef6df7cab2202260c034d21" # Replace with your real key
+    API_KEY = "9655acab83920a2af3ed63dedea662ae" # Replace with your real key
     loc_clean = location_query.strip().lower()
     try:
         geo_url = f"http://api.openweathermap.org/geo/1.0/direct?q={loc_clean}&limit=1&appid={API_KEY}"
@@ -87,7 +87,7 @@ with st.sidebar:
 
 # --- MAIN INTERFACE ---
 st.subheader("📍 Environmental Diagnostics")
-location = st.text_input("Enter Precise Location:", placeholder="e.g. Rohini, New Delhi, Delhi, India")
+location = st.text_input("Enter Precise Location:", placeholder="e.g. Rohini, Delhi, Delhi, India")
 
 if st.button("🚀 EXECUTE AI HEALTH SCAN"):
     if not location:
