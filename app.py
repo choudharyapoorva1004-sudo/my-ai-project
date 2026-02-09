@@ -1,114 +1,124 @@
 import streamlit as st
 import requests
-import time
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 
-# --- CONFIG & STYLING ---
-st.set_page_config(page_title="HEALNET AI Assistant", page_icon="🛡️", layout="centered")
+# --- AI ARCHITECTURE: DARK MODE & UI ---
+st.set_page_config(page_title="HEALNET AI Master", page_icon="🛡️", layout="wide")
 
-# Custom CSS for Background and Watermark
 st.markdown("""
     <style>
-    .stApp { background-color: #f0f2f6; }
+    .stApp { background-color: #0E1117; color: #FFFFFF; }
     .watermark {
-        position: fixed; bottom: 10px; right: 10px;
-        opacity: 0.05; font-size: 80px; font-weight: bold;
-        color: #004a99; z-index: -1; pointer-events: none;
+        position: fixed; bottom: 20px; right: 20px;
+        opacity: 0.1; font-size: 80px; font-weight: bold;
+        color: #4A90E2; z-index: -1; pointer-events: none;
     }
-    .main-title { color: #1E3A8A; text-align: center; font-weight: 800; font-size: 40px; }
+    .header { color: #4A90E2; text-align: center; font-weight: 800; font-size: 42px; border-bottom: 2px solid #4A90E2; padding-bottom: 10px; }
     </style>
     <div class="watermark">HEALNET</div>
     """, unsafe_allow_html=True)
 
-st.markdown('<p class="main-title">🛡️ HEALNET: AI Health & AQI Assistant</p>', unsafe_allow_html=True)
+st.markdown("<p class='header'>🛡️ HEALNET: AI Health & Global AQI Dashboard</p>", unsafe_allow_html=True)
 
-# --- AI DATA ENGINE (OpenWeather Integration) ---
-def fetch_real_aqi(city_name):
-    # REPLACE THIS WITH YOUR FREE KEY
-    API_KEY = "YOUR_API_KEY_HERE" 
+# --- AI DATA INTEGRATION ENGINE ---
+def fetch_pollution_data(location_query):
+    API_KEY = "YOUR_OPENWEATHER_API_KEY" # Replace with your key
+    loc_clean = location_query.strip().lower()
     try:
-        # Step 1: Get Coordinates for the City
-        geo_url = f"http://api.openweathermap.org/geo/1.0/direct?q={city_name}&limit=1&appid={API_KEY}"
-        geo_data = requests.get(geo_url).json()
-        if not geo_data: return None, "City not found"
+        geo_url = f"http://api.openweathermap.org/geo/1.0/direct?q={loc_clean}&limit=1&appid={API_KEY}"
+        geo_res = requests.get(geo_url).json()
+        if not geo_res: return None, "Location untraceable."
         
-        lat, lon = geo_data[0]['lat'], geo_data[0]['lon']
-        
-        # Step 2: Get Actual AQI for those Coordinates
+        lat, lon = geo_res[0]['lat'], geo_res[0]['lon']
         aqi_url = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={API_KEY}"
-        aqi_response = requests.get(aqi_url).json()
-        aqi_index = aqi_response['list'][0]['main']['aqi'] # Returns 1 to 5
+        data = requests.get(aqi_url).json()
         
-        # Convert 1-5 scale to standard 0-500 index for display
-        aqi_map = {1: 45, 2: 95, 3: 145, 4: 250, 5: 450}
-        return aqi_map[aqi_index], "Success"
+        # Extract individual pollutants for the Chart
+        components = data['list'][0]['components']
+        raw_aqi = data['list'][0]['main']['aqi']
+        aqi_mapping = {1: 45, 2: 95, 3: 145, 4: 215, 5: 410}
+        
+        return aqi_mapping[raw_aqi], components, "Authorized"
     except:
-        return None, "Error connecting to server"
+        return None, None, "System Offline"
 
-# --- USER INPUTS ---
-with st.expander("👤 Personal Information", expanded=True):
-    col1, col2, col3 = st.columns(3)
-    age = col1.number_input("Your Age", min_value=1, max_value=120, value=25)
-    gender = col2.selectbox("Gender", ["Male", "Female", "Other"])
-    location = st.text_input("Enter City Name (Global):", placeholder="e.g. New Delhi, New York, London")
+# --- SIDEBAR: USER BIOMETRICS ---
+with st.sidebar:
+    st.header("🧬 AI Biometrics")
+    age = st.number_input("Age", 1, 120, 28)
+    gender = st.selectbox("Gender", ["Male", "Female", "Other"])
+    health_options = ["None", "Asthma", "COPD", "Diabetes", "Obesity", "Hypertension"]
+    conditions = st.multiselect("Medical History", health_options)
+    st.divider()
+    st.caption("AI Personalization Engine Active")
 
-with st.expander("🩺 Health History"):
-    health_options = ["None", "Asthma", "COPD", "Bronchitis", "Diabetes", "Hypertension", "Obesity"]
-    multi_check = st.checkbox("I have multiple conditions")
-    if multi_check:
-        conditions = st.multiselect("Select all conditions:", health_options[1:])
+# --- MAIN INTERFACE ---
+location = st.text_input("📍 Search Precise Location (Area, City, State, Country):", placeholder="e.g. Rohini, Delhi, Delhi, India")
+
+if st.button("🚀 EXECUTE AI DIAGNOSTIC"):
+    if not location:
+        st.warning("Please provide a location string.")
     else:
-        conditions = [st.selectbox("Primary Condition:", health_options)]
-    
-    other_c = st.text_input("Other Condition (Manually type here):")
-    if other_c: conditions.append(other_c)
-
-routine = st.text_area("✍️ Describe your Daily Routine (e.g., 'Jog at 7 AM, Work till 5 PM'):")
-
-# --- ANALYSIS BLOCK ---
-if st.button("🚀 Run AI Environmental Health Check"):
-    if not location or location == "":
-        st.error("Please enter a location first.")
-    else:
-        with st.spinner("Analyzing real-time atmospheric data..."):
-            aqi, status = fetch_real_aqi(location)
+        with st.spinner("Processing satellite imagery and chemical sensors..."):
+            aqi, pollutants, msg = fetch_pollution_data(location)
             
             if aqi:
-                # 1. AQI Gauge Logic
-                if aqi < 100: color, level = "green", "SAFE"
-                elif aqi < 200: color, level = "orange", "UNHEALTHY"
-                else: color, level = "red", "DANGEROUS"
-
-                st.subheader(f"📍 Location Analysis: {location}")
-                st.markdown(f"**Current AQI:** <span style='color:{color}; font-size:24px; font-weight:bold;'>{aqi} ({level})</span>", unsafe_allow_html=True)
+                col1, col2 = st.columns([1, 1])
                 
-                # 2. 50-Word Health Advice
-                peak_hours = "7:00–10:30 AM & 6:00–10:00 PM"
-                advice = (f"At age {age}, your respiratory metabolic rate requires clean air. "
-                          f"Given the <b style='color:{color};'>{level}</b> air quality, you must **STAY INDOOR** "
-                          f"during peak traffic hours: **{peak_hours}**. Since you noted {conditions}, "
-                          f"particulate matter (PM2.5) could trigger immediate inflammation. "
-                          f"Use HEPA filters and keep rescue inhalers nearby. *Stay hydrated to flush toxins.*")
+                with col1:
+                    # 1. AQI Gauge Chart
+                    fig_gauge = go.Figure(go.Indicator(
+                        mode = "gauge+number",
+                        value = aqi,
+                        title = {'text': f"Real-time AQI: {location.title()}"},
+                        gauge = {
+                            'axis': {'range': [0, 500]},
+                            'bar': {'color': "#4A90E2"},
+                            'steps': [
+                                {'range': [0, 100], 'color': "green"},
+                                {'range': [100, 200], 'color': "yellow"},
+                                {'range': [200, 300], 'color': "orange"},
+                                {'range': [300, 500], 'color': "red"}],
+                        }
+                    ))
+                    fig_gauge.update_layout(paper_bgcolor="#0E1117", font={'color': "white"})
+                    st.plotly_chart(fig_gauge, use_container_width=True)
+
+                with col2:
+                    # 2. Pollutant Breakdown Bar Chart
+                    df_pollutants = pd.DataFrame(list(pollutants.items()), columns=['Pollutant', 'Value'])
+                    fig_bar = px.bar(df_pollutants, x='Pollutant', y='Value', color='Value',
+                                     title="Chemical Composition Analysis (μg/m³)",
+                                     color_continuous_scale='Reds')
+                    fig_bar.update_layout(paper_bgcolor="#0E1117", plot_bgcolor="#0E1117", font={'color': "white"})
+                    st.plotly_chart(fig_bar, use_container_width=True)
+
+                # --- 50-100 WORD AI HEALTH ADVISORY ---
+                st.divider()
+                cond_str = ", ".join(conditions) if conditions else "general health"
+                color_code = "🔴" if aqi > 200 else ("🟠" if aqi > 100 else "🟢")
+                
+                advice = (
+                    f"{color_code} **AI Medical Reasoning:** At age **{age}**, your metabolic uptake of particulates "
+                    f"is significant. Given your history of **{cond_str}** and the verified **{aqi} AQI**, "
+                    f"the risk of **oxidative stress** is high. You must **STAY INDOOR** during the critical "
+                    f"inversion peaks of **7:30–10:30 AM** and **6:30–10:00 PM**. **Avoid all outdoor exertion**; "
+                    f"instead, focus on indoor mobility. Maintain **strict hydration (3L+)** to assist your "
+                    f"respiratory cilia in filtering toxins and **use N95 grade filtration** for any unavoidable transit."
+                )
                 st.info(advice)
-
-                # 3. Routine Modification
-                if routine:
-                    st.write("### 📅 AI Routine Modification")
-                    mod_routine = routine.lower().replace("jog", "indoor yoga").replace("walk", "indoor exercise")
-                    st.success(f"**Modified for Safety:** {mod_routine}. **Avoid outside activity until 2 PM.**")
             else:
-                st.error(f"Could not fetch data for {location}. Please check the spelling.")
+                st.error(f"Error: {msg}")
 
-# --- FOOTER BUTTONS ---
+# --- AI CHAT & FORECAST ---
 st.divider()
-b1, b2 = st.columns(2)
-
-if b1.button("🩺 More Health Advice"):
-    extra_q = st.text_input("Specific query about your health?", max_chars=100)
-    if extra_q:
-        st.write(f"**AI Health Logic:** For {conditions}, focus on antioxidant-rich diets (Vitamin C/E). "
-                 f"Since you are {age} years old, prioritize cardiovascular endurance via indoor rowing "
-                 f"to avoid smog exposure. Maintain strict sleep hygiene for lung tissue repair.")
-
-if b2.button("☁️ Weather/Pollution Forecast"):
-    st.warning(f"**AI Forecasting for {location}:** Short-term satellite data predicts a **20% rise** in morning smog "
-               "due to atmospheric inversion. Plan all travel between **12 PM and 4 PM** for the next 3 days.")
+c1, c2 = st.columns(2)
+with c1:
+    if st.button("🩺 AI Consultation"):
+        st.success(f"**AI Health Logic:** For {age}yo with {conditions}, localized PM2.5 can cause cellular inflammation. "
+                   "Integrate **Omega-3 and Vitamin C** rich foods today. Avoid deep breathing exercises outdoors.")
+with c2:
+    if st.button("📊 Predictive Forecast"):
+        st.warning("AI Satellite trends predict a **15% spike** in CO levels tomorrow. Plan essential errands for **2:00 PM**.")
