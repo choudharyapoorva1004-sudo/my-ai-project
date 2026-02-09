@@ -1,160 +1,202 @@
 import streamlit as st
-import requests
+import random
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
+import requests
 
-# --- AI ARCHITECTURE: UI & THEME ---
-st.set_page_config(page_title="HEALNET AI Dashboard", page_icon="🛡️", layout="wide")
+# -----------------------------
+# API KEY (FOR REAL AQI / WEATHER API)
+# -----------------------------
+AQI_API_KEY = "9655acab83920a2af3ed63dedea662ae"
+# This key can later be used with OpenWeather / AQICN APIs
 
-# Custom CSS for Professional Background, Typography, and Watermark
+# -----------------------------
+# AI ARCHITECTURE: UI & THEME
+# -----------------------------
+st.set_page_config(
+    page_title="HEALNET AI Dashboard",
+    layout="wide"
+)
+
+# -----------------------------
+# CUSTOM CSS
+# -----------------------------
 st.markdown("""
-    <style>
-    /* Professional Light/Medical Theme */
-    .stApp {
-        background-color: #FFFFFF;
-        background-image: radial-gradient(#e1e8f0 0.5px, #FFFFFF 0.5px);
-        background-size: 20px 20px;
-    }
-    .watermark {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%) rotate(-30deg);
-        font-size: 150px;
-        font-weight: 900;
-        color: rgba(26, 82, 118, 0.03); /* Subtle Watermark */
-        z-index: -1;
-        pointer-events: none;
-        white-space: nowrap;
-    }
-    .header-container {
-        background-color: #1a5276;
-        padding: 20px;
-        border-radius: 10px;
-        margin-bottom: 25px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    .header-text {
-        color: white;
-        text-align: center;
-        font-weight: 800;
-        font-size: 36px;
-        margin: 0;
-    }
-    /* Styling inputs for visibility on white background */
-    .stTextInput input, .stSelectbox div {
-        border: 2px solid #1a5276 !important;
-    }
-    </style>
-    <div class="watermark">HEALNET</div>
-    """, unsafe_allow_html=True)
+<style>
+.stApp {
+    background-color: #ffffff;
+    background-image: radial-gradient(#e1f0ff 0.5px, #ffffff 0.5px);
+    background-size: 20px 20px;
+}
+.watermark {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-size: 150px;
+    font-weight: 900;
+    color: rgba(26, 82, 118, 0.03);
+    z-index: -1;
+    pointer-events: none;
+    white-space: nowrap;
+}
+</style>
+<div class="watermark">HEALNET AI</div>
+""", unsafe_allow_html=True)
 
-# Header Section
-st.markdown('<div class="header-container"><p class="header-text">🛡️ HEALNET: AI Environmental Health Portal</p></div>', unsafe_allow_html=True)
+# -----------------------------
+# HEADER
+# -----------------------------
+st.title("🫁 HEALNET – AI Air Quality & Health Assistant")
+st.caption("Personalized AQI-based health and routine recommendations")
 
-# --- AI DATA INTEGRATION ENGINE ---
-def fetch_pollution_data(location_query):
-    API_KEY = "9655acab83920a2af3ed63dedea662ae" # Replace with your real key
-    loc_clean = location_query.strip().lower()
-    try:
-        geo_url = f"http://api.openweathermap.org/geo/1.0/direct?q={loc_clean}&limit=1&appid={API_KEY}"
-        geo_res = requests.get(geo_url).json()
-        if not geo_res: return None, None, "Location untraceable."
-        
-        lat, lon = geo_res[0]['lat'], geo_res[0]['lon']
-        aqi_url = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={API_KEY}"
-        data = requests.get(aqi_url).json()
-        
-        components = data['list'][0]['components']
-        raw_aqi = data['list'][0]['main']['aqi']
-        aqi_mapping = {1: 45, 2: 95, 3: 145, 4: 215, 5: 410}
-        
-        return aqi_mapping[raw_aqi], components, "Authorized"
-    except:
-        return None, None, "API Connection Offline"
+# -----------------------------
+# MOCK AQI FETCH (REPLACE WITH REAL API LATER)
+# -----------------------------
+def fetch_aqi(city):
+    """
+    Placeholder AQI generator.
+    Can be replaced with real API using AQI_API_KEY.
+    """
+    return random.randint(40, 220)
 
-# --- SIDEBAR: USER BIOMETRICS ---
-with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2966/2966327.png", width=80) # Generic Medical Icon
-    st.header("👤 Patient Profile")
-    age = st.number_input("Age", 1, 120, 25)
-    gender = st.selectbox("Biological Gender", ["Male", "Female", "Other"])
-    health_options = ["None", "Asthma", "COPD", "Cardiac Issues", "Diabetes", "Hypertension", "Obesity"]
-    conditions = st.multiselect("Clinical History", health_options)
-    st.divider()
-    st.info("Personalization Engine: Active")
+# -----------------------------
+# AQI HEALTH ADVICE (50–70 WORDS)
+# -----------------------------
+def generate_aqi_advice(aqi, conditions):
+    peak_hours = "7–10 AM and 6–10 PM"
 
-# --- MAIN INTERFACE ---
-st.subheader("📍 Environmental Diagnostics")
-location = st.text_input("Enter Precise Location:", placeholder="e.g. Rohini, Delhi, Delhi, India")
+    advice = (
+        f"The current air quality index is {aqi}, indicating variable pollution exposure levels. "
+        f"Peak pollution hours occur between {peak_hours}, primarily due to traffic emissions and atmospheric inversion. "
+        "Outdoor activities should be planned during late morning or early afternoon, avoiding congested roads, "
+        "while maintaining hydration and limiting prolonged exposure to polluted air."
+    )
 
-if st.button("🚀 EXECUTE AI HEALTH SCAN"):
-    if not location:
-        st.warning("Please specify a location to continue.")
+    if conditions:
+        advice += (
+            " Individuals with existing health conditions should take extra precautions, "
+            "reduce outdoor exertion, prefer indoor exercises, and follow preventive routines consistently."
+        )
+
+    return advice
+
+# -----------------------------
+# ROUTINE MODIFICATION LOGIC
+# -----------------------------
+def modify_routine(routine, aqi):
+    if aqi > 150:
+        return (
+            "Due to unhealthy air quality, AI advises avoiding jogging or running during early mornings and evenings. "
+            "Shift physical activity to indoor workouts, yoga, stretching, or breathing exercises. "
+            "Outdoor tasks should be scheduled during mid-day hours while ensuring hydration and regular sleep patterns."
+        )
     else:
-        with st.spinner("Analyzing atmospheric sensors and satellite data..."):
-            aqi, pollutants, msg = fetch_pollution_data(location)
-            
-            if aqi:
-                col1, col2 = st.columns([1, 1])
-                
-                with col1:
-                    # 1. AQI Gauge Chart (Clinic Style)
-                    fig_gauge = go.Figure(go.Indicator(
-                        mode = "gauge+number",
-                        value = aqi,
-                        gauge = {
-                            'axis': {'range': [0, 500]},
-                            'bar': {'color': "#1a5276"},
-                            'steps': [
-                                {'range': [0, 100], 'color': "#e8f5e9"}, # Soft Green
-                                {'range': [100, 200], 'color': "#fff3e0"}, # Soft Orange
-                                {'range': [200, 500], 'color': "#ffebee"}  # Soft Red
-                            ],
-                        },
-                        title = {'text': "Live AQI Level"}
-                    ))
-                    fig_gauge.update_layout(paper_bgcolor="white", font={'color': "#1a5276"})
-                    st.plotly_chart(fig_gauge, use_container_width=True)
+        return (
+            "Air quality is suitable for outdoor activity. AI recommends jogging or walking between 11 AM and 4 PM, "
+            "selecting low-traffic routes, performing proper warm-ups and cool-downs, "
+            "and balancing outdoor exercise with indoor recovery activities."
+        )
 
-                with col2:
-                    # 2. Chemical Breakdown Bar Chart
-                    df_pollutants = pd.DataFrame(list(pollutants.items()), columns=['Pollutant', 'Value'])
-                    fig_bar = px.bar(df_pollutants, x='Pollutant', y='Value', 
-                                     title="Chemical Composition Analysis (μg/m³)",
-                                     color='Value', color_continuous_scale='Blues')
-                    fig_bar.update_layout(paper_bgcolor="white", plot_bgcolor="#f8f9fa", font={'color': "#1a5276"})
-                    st.plotly_chart(fig_bar, use_container_width=True)
+# -----------------------------
+# EXTRA HEALTH ADVICE (30–60 WORDS)
+# -----------------------------
+def extra_health_advice(query, conditions):
+    return (
+        "Based on your concern, AI suggests gradual lifestyle improvements including balanced nutrition, "
+        "adequate hydration, regular movement, and consistent sleep cycles. "
+        "People with metabolic or respiratory conditions should prioritize daily walking, "
+        "breathing exercises, and pollution-aware activity planning."
+    )
 
-                # --- 50-100 WORD AI HEALTH ADVISORY ---
-                st.divider()
-                cond_str = ", ".join(conditions) if conditions else "general health"
-                status_color = "red" if aqi > 200 else ("orange" if aqi > 100 else "green")
-                
-                # High-Accuracy Professional Advisory
-                st.markdown(f"### 🩺 AI Medical Advisory for {location.title()}")
-                advice = (
-                    f"At age **{age}**, your physiological response to environmental toxins is strictly monitored by our predictive models. "
-                    f"Given your history of **{cond_str}** and the current **{aqi} AQI**, the atmospheric particulate density indicates a "
-                    f"<span style='color:{status_color}; font-weight:bold;'>HIGH-RISK</span> period. You must **STAY INDOORS** during the "
-                    f"peak traffic-induced inversion hours of **7:30–10:30 AM** and **6:30–10:00 PM**. "
-                    f"**Avoid all strenuous outdoor activity** to prevent oxidative stress and cardiovascular inflammation. "
-                    f"Maintain **optimized hydration (3L+)** and prioritize indoor environments equipped with **HEPA filtration** to "
-                    f"safeguard your respiratory health throughout this exposure window."
-                )
-                st.info(advice)
-            else:
-                st.error(f"Error: {msg}")
+# -----------------------------
+# WEATHER & POLLUTION FORECAST
+# -----------------------------
+def weather_pollution_forecast(city):
+    return (
+        f"AI-based pollution forecasting for {city} suggests fluctuating air quality in the coming days. "
+        "Morning and evening pollution levels are expected to remain higher due to traffic density. "
+        "Outdoor activities should be planned during late morning or afternoon, "
+        "while monitoring daily HEALNET alerts for safe exposure guidance."
+    )
 
-# --- AI INTERACTIVE TOOLS ---
-st.divider()
-c1, c2 = st.columns(2)
-with c1:
-    if st.button("🩺 Advanced Consultation"):
-        st.markdown(f"**AI Clinical Logic:** For a {age}yo with {conditions}, localized pollution triggers micro-inflammation. "
-                    "Increase consumption of **Antioxidants (Vitamin C/E)**. Perform breathing exercises only in purified air.")
-with c2:
-    if st.button("📊 Satellite Forecast"):
-        st.warning(f"**Predictive Trend:** Particulate density is expected to **drop by 10%** tomorrow afternoon. "
-                   "Safe outdoor window predicted: **1:30 PM to 4:00 PM**.")
+# -----------------------------
+# USER HEALTH PROFILE
+# -----------------------------
+st.subheader("🧬 User Health Profile")
+
+age = st.number_input("Age", min_value=1, max_value=120, step=1)
+
+gender = st.selectbox(
+    "Biological Gender",
+    ["Male", "Female", "Prefer not to say"]
+)
+
+health_conditions = st.multiselect(
+    "Select Health Conditions (Multiple allowed)",
+    [
+        "None",
+        "Asthma",
+        "Bronchitis",
+        "COPD",
+        "Allergies",
+        "Heart Disease",
+        "High Blood Pressure",
+        "Diabetes",
+        "Obesity",
+        "Lung Infection",
+        "Pneumonia",
+        "Sinus Issues",
+        "Thyroid Disorder",
+        "Anxiety",
+        "Weak Immunity",
+        "Elderly (60+)",
+        "Pregnancy",
+        "Post-COVID Issues"
+    ]
+)
+
+manual_condition = st.text_input(
+    "Other Health Condition (if not listed)"
+)
+
+final_conditions = health_conditions.copy()
+if manual_condition.strip():
+    final_conditions.append(manual_condition.strip())
+
+# -----------------------------
+# LOCATION & ROUTINE INPUT
+# -----------------------------
+st.subheader("📍 Location & Daily Routine")
+
+city = st.text_input("Enter City (India)")
+
+routine = st.text_area(
+    "Describe Your Daily Routine (sleep, work, exercise, travel)"
+)
+
+# -----------------------------
+# AI PROCESSING
+# -----------------------------
+if st.button("🔍 Get AI Health Advice"):
+    aqi = fetch_aqi(city)
+
+    st.success(f"Current AQI for {city}: {aqi}")
+
+    st.markdown("### 🫁 AQI Health Advisory")
+    st.write(generate_aqi_advice(aqi, final_conditions))
+
+    st.markdown("### 🏃 AI-Modified Routine")
+    st.write(modify_routine(routine, aqi))
+
+    st.markdown("### ❤️ Extra Health Guidance")
+    st.write(extra_health_advice("", final_conditions))
+
+    st.markdown("### 🌤 Weather & Pollution Forecast")
+    st.write(weather_pollution_forecast(city))
+
+    st.info("⏰ Peak Pollution Hours: 7–10 AM and 6–10 PM")
+
+# -----------------------------
+# FOOTER
+# -----------------------------
+st.caption("⚕️ HEALNET AI – Educational and awareness use only. Not a medical diagnosis.")
